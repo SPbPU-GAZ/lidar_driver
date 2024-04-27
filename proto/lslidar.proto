@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+package apollo.drivers.ls180s2_gazel;
+
+import "modules/drivers/lidar/proto/lslidar_config.proto";
+
+message PointCloud2 {
+    optional LslidarHeader header = 1;
+    optional uint32 height = 2;
+    optional uint32 width = 3;
+    repeated PointField fields = 4; // []
+    optional bool is_bigendian = 5;
+    optional uint32 point_step = 6;
+    optional uint32 row_step = 7;
+    repeated uint32 data = 8; // []
+    optional bool is_dense = 9;
+}
+
+message LslidarMsgLaserScan {
+    optional LslidarMsgPoint scan_channel = 1;
+}
+
+message INT64 {
+    optional int64 loss = 1;
+}
+
+message LslidarMsgRawPacket {
+    optional LslidarHeader header = 1;
+    optional uint64 stamp = 2;
+    repeated double prism_angle = 3; // [4]
+    repeated uint32 data = 4; // [1206]
+}
+
+message LslidarMsgScanUnfield {
+    optional LslidarHeader header = 1;
+    optional uint64 basetime = 2;
+    repeated LslidarMsgRawPacket packets = 3; // []
+}
+
+message LslidarMsgScan {
+    optional double altitude = 1;
+    repeated LslidarMsgPoint points = 2; // []
+}
+
+message LslidarMsgSweep {
+    optional LslidarHeader header = 1;
+    repeated LslidarMsgScan scans = 2; // [128]
+}
+
+message LslidarSrvDataIp {
+    optional string data_ip = 1;
+}
+
+message LslidarSrvDataPort {
+    optional int32 data_port = 1;
+}
+
+message LslidarSrvDestinationIp {
+    optional string data_ip = 1;
+}
+
+message LslidarSrvDevPort {
+    optional int32 data_port = 1;
+}
+
+message LslidarSrvFrameRate {
+    optional int32 frame_rate = 1;
+}
+
+message LslidarSrvResult {
+    optional bool result = 1;
+}
