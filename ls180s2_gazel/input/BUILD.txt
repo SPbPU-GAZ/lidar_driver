@@ -1,0 +1,69 @@
+load("//tools/install:install.bzl", "install")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
+load("//tools:cpplint.bzl", "cpplint")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(name = "pcap_library",
+    hdrs = [
+        "pcap.h"
+        ],
+    linkopts = [
+        "-lpthread",
+        "-lpcap",
+    ],
+)
+
+cc_library(name = "lslidar_input_library",
+    srcs = [
+        "input.cc", 
+        ],
+    hdrs = [
+        "input.h",
+        ],
+    deps = [
+        "//cyber",
+        "//modules/drivers/lidar/ls180s2_gazel/proto:lslidar_proto",
+        "//modules/drivers/lidar/ls180s2_gazel/driver:pcap_library",
+        "@local_config_pcl//:pcl",
+        "@eigen",
+        ],
+    #linkopts = [
+    #    "-lpthread",
+    #    "-lpcap",
+    #    ],
+)
+
+cc_library(name = "lslidar_input_component_library",
+    srcs = [
+        "input_component.cc", 
+        ],
+    hdrs = [
+        "input_component.h",
+        ],
+    deps = [
+        "//cyber",
+        "//modules/drivers/lidar/ls180s2_gazel/proto:lslidar_input_library",
+        "//modules/drivers/lidar/ls180s2_gazel/driver:pcap_library",
+        "@local_config_pcl//:pcl",
+        "@eigen",
+        ],
+    #linkopts = [
+    #    "-lpthread",
+    #    "-lpcap",
+    #    ],
+)
+
+#cc_binary(
+#    name = "lslidar_binary.so",
+#    srcs = ["lslidar_ls_driver_node.cc"],
+#    linkshared = True,
+#    linkstatic = True,
+#    deps = [
+#        "//cyber",
+#        ":lslidar_library",
+#    ],
+#)
+
+
+cpplint()
