@@ -2,6 +2,6 @@
     <module>
         <name>Lslidar</name>
         <dag_conf>/apollo/modules/drivers/lidar/ls180s2_gazel/dag/lslidar_dag.dag</dag_conf>
-        <process_name>LslidarProcess</process_name>
+        <process_name>lslidar</process_name>
     </module>
 </cyber>

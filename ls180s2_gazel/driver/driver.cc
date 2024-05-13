@@ -25,7 +25,6 @@ using namespace std::chrono;
 namespace apollo {
 namespace drivers {
 namespace ls180s2_gazel {
-    
     float g_fDistanceAcc = 0.1 * 0.01f;
     float m_offset = 6.37f;
     double sin30 = sin(DEG2RAD(30));
@@ -99,7 +98,7 @@ namespace ls180s2_gazel {
         point_cloud_xyzirt_(new pcl::PointCloud<VPoint>),
         point_cloud_xyzirt_bak_(new pcl::PointCloud<VPoint>),
         point_cloud_xyzirt_pub_(new pcl::PointCloud<VPoint>){
-
+        AERROR << "101 LslidarChDriver::LslidarChDriver ls180s2_gazel::Config start line" << std::endl;
         // node_ = apollo::cyber::CreateNode("lslidar_node", "");
 
         // create the sin and cos table for different azimuth and vertical values
@@ -115,6 +114,7 @@ namespace ls180s2_gazel {
             cos_mirror_angle[i] = cos(DEG2RAD(mirror_angle[i]));
             sin_mirror_angle[i] = sin(DEG2RAD(mirror_angle[i]));
         }
+        AERROR << "117 LslidarChDriver::LslidarChDriver ls180s2_gazel::Config end line" << std::endl;
     }
 
         LslidarChDriver::LslidarChDriver(const std::shared_ptr<::apollo::cyber::Node>& node,
@@ -143,6 +143,7 @@ namespace ls180s2_gazel {
         point_cloud_xyzirt_(new pcl::PointCloud<VPoint>),
         point_cloud_xyzirt_bak_(new pcl::PointCloud<VPoint>),
         point_cloud_xyzirt_pub_(new pcl::PointCloud<VPoint>){
+        AERROR << "146 LslidarChDriver::LslidarChDriver start line" << std::endl;
 
         // node_ = apollo::cyber::CreateNode("lslidar_node", "");
 
@@ -159,6 +160,7 @@ namespace ls180s2_gazel {
             cos_mirror_angle[i] = cos(DEG2RAD(mirror_angle[i]));
             sin_mirror_angle[i] = sin(DEG2RAD(mirror_angle[i]));
         }
+        AERROR << "163 LslidarChDriver::LslidarChDriver end line" << std::endl;
     }
 
     LslidarChDriver::~LslidarChDriver() {
@@ -169,13 +171,14 @@ namespace ls180s2_gazel {
     }
 
     bool LslidarChDriver::loadParameters() {
+        AERROR << "174 LslidarChDriver::loadParameters start line" << std::endl;
         dump_file = ""; // comented in original version of launch file and "" in code
         packet_rate = conf_.packet_rate();
         lidar_ip_string = conf_.devip_str();
         msop_udp_port = conf_.msop_port();
         difop_udp_port = conf_.difop_port();
         add_multicast = conf_.add_multicast();
-        group_ip_string = conf_.msop_port();
+        group_ip_string = conf_.group_ip();
         min_range = conf_.min_range();
         max_range = conf_.max_range();
         scan_start_angle = conf_.scan_start_angle();
@@ -184,23 +187,40 @@ namespace ls180s2_gazel {
         pointcloud_topic = conf_.pointcloud_topic();
         use_time_service = conf_.use_time_service();
         packet_loss = conf_.packet_loss();
+        
+        AERROR << "dump_file " << dump_file << std::endl;
+        AERROR << "packet_rate " << packet_rate << std::endl;
+        AERROR << "lidar_ip_string " << lidar_ip_string << std::endl;
+        AERROR << "msop_udp_port " << msop_udp_port << std::endl;
+        AERROR << "difop_udp_port " << difop_udp_port << std::endl;
+        AERROR << "add_multicast " << add_multicast << std::endl;
+        AERROR << "group_ip_string " << group_ip_string << std::endl;
+        AERROR << "min_range " << min_range << std::endl;
+        AERROR << "max_range " << max_range << std::endl;
+        AERROR << "scan_start_angle " << scan_start_angle << std::endl;
+        AERROR << "scan_end_angle " << scan_end_angle << std::endl;
+        AERROR << "frame_id " << frame_id << std::endl;
+        AERROR << "pointcloud_topic " << pointcloud_topic << std::endl;
+        AERROR << "use_time_service " << use_time_service << std::endl;
+        AERROR << "packet_loss " << packet_loss << std::endl;
 
         AINFO << "Using time service or not: " << use_time_service;
         AINFO << "Is packet loss detection enabled: " << packet_loss;
         //inet_aton(lidar_ip_string.c_str(), &lidar_ip);
-        AINFO << "Only accepting packets from IP address: " << lidar_ip_string.c_str();
+        AERROR << "Only accepting packets from IP address: " << lidar_ip_string.c_str();
         if (add_multicast) 
-            AINFO << "Opening UDP socket: group_address " << group_ip_string;
+            AERROR << "Opening UDP socket: group_address " << group_ip_string;
 
+        AERROR << "214 LslidarChDriver::loadParameters end line" << std::endl;
         return true;
     }
 
     bool LslidarChDriver::createCyberIO() {
+        AERROR << "219 LslidarChDriver::createCyberIO start line" << std::endl;
         point_cloud_pub = node_->CreateWriter<PointCloud2>(pointcloud_topic);
         if (packet_loss){
             packet_loss_pub = node_->CreateWriter<INT64>("packet_loss");
         }
-
         frame_rate_service_ = node_->CreateService<LslidarSrvFrameRate, LslidarSrvResult>(
             "set_frame_rate", [this](const std::shared_ptr<LslidarSrvFrameRate>& req, std::shared_ptr<LslidarSrvResult>& res){
                 if (!is_get_difop_) {
@@ -424,10 +444,12 @@ namespace ls180s2_gazel {
 
             difop_thread_ = std::make_shared<std::thread>([this]() { difopPoll(); });
 
+            AERROR << "448 LslidarChDriver::createCyberIO end line" << std::endl;
             return true;
     }
 
     bool LslidarChDriver::Init() {
+        AERROR << "453 LslidarChDriver::Init start line" << std::endl;
         this->initTimeStamp();
         if (!loadParameters()) {
             AERROR << "Cannot load all required ROS parameters...";
@@ -438,36 +460,62 @@ namespace ls180s2_gazel {
             AERROR << "Cannot create all Cyber IO...";
             return false;
         }
+        AERROR << "464 LslidarChDriver::Init end line" << std::endl;
         return true;
     }
 
     bool LslidarChDriver::polling() {
+        AERROR << "469 LslidarChDriver::polling start line " << std::endl;
         // Allocate a new shared pointer for zero-copy sharing with other nodelets.
         // LslidarMsgRawPacket packet(new LslidarMsgRawPacket());
         std::shared_ptr<LslidarMsgRawPacket> packet = std::make_shared<LslidarMsgRawPacket>();
+        std::shared_ptr<LslidarRecvData> packet_struct = std::make_shared<LslidarRecvData>();
         LslidarHeader* headerLslidarRawPacket = packet->mutable_header();
 
-        if (sizeof(packet->data()) < packet_size_proto_check) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            AINFO << "Waiting for packet size correction. Field size now: " << sizeof(packet->data()) << std::endl;
-        }
+        // packet->mutable_prism_angle()->Reserve(4);
+        // packet->mutable_data()->Reserve(1206);
+
+        packet->mutable_prism_angle()->Resize(4, 0.0);
+        packet->mutable_data()->Resize(1206, 0);
+
         // Since the lslidar delivers data at a very high rate, keep
         // reading and publishing scans as fast as possible.
         while (true) {
             // keep reading until full packet received
-            int rc = msop_input_->getPacket(*packet);
+            int rc = msop_input_->getPacket(*packet_struct);
             if (rc == 0) {
                 break;       // got a full packet?
             }
             if (rc < 0) return false; // end of file reached?
         }
+        while (sizeof(packet_struct->data) < packet_size_proto_check) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        headerLslidarRawPacket->set_seq(packet_struct->seq);
+        headerLslidarRawPacket->set_stamp(packet_struct->header_stamp);
+        headerLslidarRawPacket->set_frame_id(packet_struct->frame_id);
+        packet->set_stamp(packet_struct->stamp);
+        // packet->set_prism_angle(packet_struct->prism_angle);
+        // packet->set_data(packet_struct->data);
+        for (unsigned int i = 0; i < 4; i++){
+            packet->set_prism_angle(i, packet_struct->prism_angle[i]);
+        }
+        for (unsigned int i = 0; i < 1206; i++){
+            packet->set_data(i, packet_struct->data[i]);
+        }
+        AERROR << std::endl << "510 after data init " << std::endl;
+
         // publish message using time of last packet read
+
         if (use_time_service) {
+            AERROR << std::endl << "515 inside use_time_service " << std::endl;
             // it is already the msop msg
             // use the first packets
+
             std::shared_ptr<LslidarMsgRawPacket> pkt = packet;
             LslidarHeader* headerLslidarRawPkt = pkt->mutable_header();
-            if (0xff == pkt->data(1194)) {    //ptp授时 // No changes here, see if it works for code itself, but uint64_t -> uint32_t
+            if (0xff == pkt->data(1194)) {    //ptp授时 // No changes here, see if it works for code itself, but uint64_t -> uint32_t     
                 uint32_t timestamp_s = (pkt->data(1195) * 0 + (pkt->data(1196) << 24) + 
                                         (pkt->data(1197) << 16) + (pkt->data(1198) << 8) + pkt->data(1199) * pow(2, 0));
                 uint32_t timestamp_nsce = (pkt->data(1200) << 24) + (pkt->data(1201) << 16) +
@@ -502,6 +550,7 @@ namespace ls180s2_gazel {
                 current_packet_time = timeStamp.ToSecond();       // packet->header.stamp.toSec();
             }
         } else {
+            AERROR << std::endl << "515 inside else use_time_service " << std::endl;
             // packet->header.stamp = apollo::cyber::Time::now();
             // current_packet_time = packet->header.stamp.toSec();
             headerLslidarRawPacket->set_stamp(apollo::cyber::Time::Now().ToSecond());
@@ -509,24 +558,29 @@ namespace ls180s2_gazel {
         }
 
         lslidarChPacketProcess(packet);
+        AERROR << "554 LslidarChDriver::polling end line " << std::endl;
         return true;
     }
 
     void LslidarChDriver::initTimeStamp() {
+        AERROR << "559 LslidarChDriver::initTimeStamp start line " << std::endl;
         for (unsigned char &i : this->packetTimeStamp) {
             i = 0;
         }
         this->pointcloudTimeStamp = 0;
         this->timeStamp = apollo::cyber::Time(0.0);
+        AERROR << "565 LslidarChDriver::initTimeStamp end line " << std::endl;
     }
 
     void LslidarChDriver::difopPoll() {
+        AERROR << "569 LslidarChDriver::difopPoll start line " << std::endl;
         //LslidarMsgRawPacket difop_packet(new LslidarMsgRawPacket());
         LslidarMsgRawPacket* difop_packet = new LslidarMsgRawPacket();
+        std::shared_ptr<LslidarRecvData> difop_packet_recv = std::make_shared<LslidarRecvData>();
         // reading and publishing scans as fast as possible.
         while (apollo::cyber::OK()) { // ros::ok()
             // keep reading
-            int rc = difop_input_->getPacket(*difop_packet);
+            int rc = difop_input_->getPacket(*difop_packet_recv);
             if (rc == 0) {
                 if (difop_packet->data(0) == 0x00 || difop_packet->data(0) == 0xa5) {
                     if (difop_packet->data(1) == 0xff && difop_packet->data(2) == 0x00 &&
@@ -581,11 +635,13 @@ namespace ls180s2_gazel {
             } else if (rc < 0) {
                 return;
             }
+            AERROR << "631 LslidarChDriver::difopPoll end line " << std::endl;
             // ros::spinOnce(); nothing to add here, still should work
         }
     }
 
     void LslidarChDriver::publishPointCloudNew() {
+        AERROR << "637 LslidarChDriver::publishPointCloudNew start line " << std::endl;
         if (!is_get_difop_) return;
         std::unique_lock<std::mutex> lock(pc_mutex_);
         point_cloud_xyzirt_pub_->header.frame_id = frame_id;
@@ -595,20 +651,12 @@ namespace ls180s2_gazel {
         LslidarChDriver::convertPCLtoROSMsg(*point_cloud_xyzirt_pub_, pc_msg, *headerPointCloud2); // possible problem
         headerPointCloud2->set_stamp(packet_timeStamp);  // pc_msg.header.stamp = packet_timeStamp; // quetinable but will try
         point_cloud_pub->Write(pc_msg);
-        ADEBUG << "pointcloud size: " << pc_msg.width();
-
-        /*  Example
-            ChunkHeaderCache* chunk_header_cache = new ChunkHeaderCache();
-            chunk_header_cache->set_begin_time(chunk_header.begin_time());
-            chunk_header_cache->set_end_time(chunk_header.end_time());
-            chunk_header_cache->set_message_number(chunk_header.message_number());
-            chunk_header_cache->set_raw_size(chunk_header.raw_size());
-            single_index->set_allocated_chunk_header_cache(chunk_header_cache);
-        */
+        AERROR << "pointcloud size: " << pc_msg.width();
+        AERROR << "648 LslidarChDriver::publishPointCloudNew end line " << std::endl;
     }
 
     int LslidarChDriver::convertCoordinate(const struct Firing &lidardata) {
-
+        AERROR << "652 LslidarChDriver::convertCoordinate start line " << std::endl;
         double fAngle_H = 0.0;         //水平角度
         double fAngle_V = 0.0;         // 垂直角度
         fAngle_H = lidardata.azimuth;
@@ -666,10 +714,12 @@ namespace ls180s2_gazel {
 
         point_cloud_xyzirt_bak_->points.push_back(point);
         ++point_cloud_xyzirt_bak_->width;
+        AERROR << "710 LslidarChDriver::convertCoordinate end line " << std::endl;
         return 0;
     }
 
     bool LslidarChDriver::lslidarChPacketProcess(const std::shared_ptr<LslidarMsgRawPacket> &msg) { // Possible problems with msg value setting
+        AERROR << "715 LslidarChDriver::lslidarChPacketProcess start line " << std::endl;
         struct Firing lidardata{};
         // Convert the msg to the raw packet type.
         //apollo::cyber::Time(timestamp).ToSecond();
@@ -890,10 +940,12 @@ namespace ls180s2_gazel {
             }
         }
         last_packet_time = current_packet_time;
+        AERROR << "715 LslidarChDriver::lslidarChPacketProcess end line " << std::endl;
         return true;
     }
 
     void LslidarChDriver::setPacketHeader(unsigned char *config_data) {
+        AERROR << "941 LslidarChDriver::setPacketHeader start line " << std::endl;
         config_data[0] = 0xAA;
         config_data[1] = 0x00;
         config_data[2] = 0xFF;
@@ -902,10 +954,12 @@ namespace ls180s2_gazel {
         config_data[5] = 0x22;
         config_data[6] = 0xAA;
         config_data[7] = 0xAA;
+        AERROR << "950 LslidarChDriver::setPacketHeader end line " << std::endl;
     }
 
     // this one  will probably not require any proto setting changes. sockaddr_in is struct
     bool LslidarChDriver::sendPacketTolidar(unsigned char *config_data) const { 
+        AERROR << "955 LslidarChDriver::sendPacketTolidar start line " << std::endl;
         int socketid;
         sockaddr_in addrSrv{};
         socketid = socket(2, 2, 0);
@@ -913,6 +967,7 @@ namespace ls180s2_gazel {
         addrSrv.sin_family = AF_INET;
         addrSrv.sin_port = htons(2368);
         sendto(socketid, (const char *) config_data, 1206, 0, (struct sockaddr *) &addrSrv, sizeof(addrSrv));
+        AERROR << "963 LslidarChDriver::sendPacketTolidar end line " << std::endl;
         return true;
     }   
 } // namespace lslidar_driver

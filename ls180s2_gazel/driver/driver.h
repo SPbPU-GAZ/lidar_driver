@@ -47,7 +47,7 @@
 #include <iostream>
 #include "ThreadPool.h"
 
-#include "input.h"
+#include "modules/drivers/lidar/ls180s2_gazel/driver/input.h"
 
 namespace apollo {
 namespace drivers {
@@ -167,7 +167,6 @@ namespace ls180s2_gazel {
         
         // ROS related variables
         std::shared_ptr<::apollo::cyber::Node> node_ = nullptr;
-        //Config conf_;
         Config conf_;
         // apollo::cyber::Node pnh;
 

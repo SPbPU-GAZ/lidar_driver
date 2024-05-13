@@ -51,6 +51,7 @@ message Config {
     optional int32 scan_start_angle = 10 [default = -60];
     optional int32 scan_end_angle = 11 [default = 60];
     optional string frame_id = 12 [default = "laser_link"];
-    optional string pointcloud_topic = 13 [default = "lslidar_point_cloud"];
-    optional bool packet_loss = 14 [default = false];
+    optional string pointcloud_topic = 13 [default = "/apollo/sensor/lslidar_point_cloud"];
+    optional bool packet_loss = 14 [default = true];
+    optional string pointcloud_topic_parsed = 15 [default = "/apollo/sensor/lslidar_point_cloud_parsed"];
 }

@@ -13,29 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
-#include "lslidar_component.h"
+#include "modules/drivers/lidar/ls180s2_gazel/driver/lslidar_component.h"
 
 namespace apollo {
 namespace drivers {
 namespace ls180s2_gazel {
 
+
 bool LslidarComponent::Init() {
+  AERROR << "24 Init start component" << std::endl;
+
   if (!GetProtoConfig(&lslidar_conf_)) {
-    AERROR << "load config error, file:" << config_file_path_;
+
+    AERROR << " Init component load config error, file:" << config_file_path_;
     return false;
   }
+
+  // signal(SIGINT, my_handler);
 
   AINFO << "conf:" << lslidar_conf_.DebugString();
 
   driver_.reset(new LslidarChDriver(node_, lslidar_conf_));
 
   if (!driver_->Init()) {
-    AERROR << "driver init error";
+
+    AERROR << "Init component driver init error" << std::endl;
     return false;
   }
+
   while (apollo::cyber::OK())
   {
     driver_->polling();
+    AERROR << "55 Init component polling already in process" << std::endl; 
   }
   
   return true;

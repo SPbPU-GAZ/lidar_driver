@@ -57,6 +57,17 @@
 namespace apollo {
 namespace drivers {
 namespace ls180s2_gazel {
+
+    typedef struct LslidarRecvData{
+        uint32_t seq;
+        uint64_t header_stamp;
+        std::string frame_id;
+        uint64_t stamp;
+        double   prism_angle[4];
+        uint32_t data[1206];
+    } LslidarRecvData;
+    
+
     extern uint32_t PACKET_SIZE;
     static uint32_t MSOP_DATA_PORT_NUMBER = 2368;   // lslidar default data port on PC
     //static uint32_t DIFOP_DATA_PORT_NUMBER = 2369;  // lslidar default difop data port on PC
@@ -78,7 +89,7 @@ namespace ls180s2_gazel {
         virtual ~Input() {
         }
 
-        virtual int getPacket(LslidarMsgRawPacket &packet) = 0;
+        virtual int getPacket(LslidarRecvData &packet) = 0;
 
         int getRpm(void);
 
@@ -88,6 +99,8 @@ namespace ls180s2_gazel {
 
         void clearUpdateFlag(void);
 
+        
+        
     protected:
         // apollo::cyber::ParameterServer parameter_server_;
         // apollo::cyber::ParameterClient parameter_client_;
@@ -112,7 +125,7 @@ namespace ls180s2_gazel {
 
         virtual ~InputSocket();
 
-        virtual int getPacket(LslidarMsgRawPacket &packet);
+        virtual int getPacket(LslidarRecvData &packet);
 
     private:
         int sockfd_; // socket field? || file descriptor or -1
@@ -127,7 +140,7 @@ namespace ls180s2_gazel {
 
         virtual ~InputPCAP();
 
-        virtual int getPacket(LslidarMsgRawPacket &packet);
+        virtual int getPacket(LslidarRecvData &packet);
 
     private:
         apollo::cyber::Rate packet_rate_; // ros::Rate

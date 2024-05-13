@@ -1,12 +1,10 @@
-# Define all coms in DAG streaming.
-
 module_config {                                             
-  module_library : "/apollo/bazel-bin/modules/drivers/lidar/ls180s2_gazel/driver/liblslidar_component.so"
+  module_library : "/apollo/bazel-bin/modules/drivers/lidar/ls180s2_gazel/lslidar_binary.so"
   components {
     class_name : "LslidarComponent"
     config {
       name : "lidar_driver"
-      config_file_path : "/apollo/modules/drivers/lidar/conf/lidar_config.pb.txt"
+      config_file_path : "/apollo/modules/drivers/lidar/ls180s2_gazel/conf/lslidar_parameters.pb.txt"
       readers {channel: "/apollo/sensor/lidar/driver"}
     }
   }

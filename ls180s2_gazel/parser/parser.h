@@ -26,26 +26,29 @@
 #include "modules/drivers/lidar/proto/lslidar_config.pb.h"
 #include "modules/drivers/lidar/proto/lslidar.pb.h"
 #include "modules/common_msgs/sensor_msgs/pointcloud.pb.h"
+#include "modules/drivers/lidar/ls180s2_gazel/driver/driver.h"
 
 #include "cyber/cyber.h"
 
 namespace apollo {
 namespace drivers {
-namespace hesai {
+namespace ls180s2_gazel {
+
+const double PI = 3.14159265358979323846;
 
 inline double degreeToRadian(double degree) { return degree * PI / 180; }
 
 class Parser {
  public:
-  Parser(const std::shared_ptr<::apollo::cyber::Node>& node,
-         const Config& conf);
+  Parser(/*const std::shared_ptr<::apollo::cyber::Node>& node,
+         const Config& conf*/);
   virtual ~Parser();
-  bool Parse(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointCloud> raw_pointcloud_out_);
+  bool Parse(std::shared_ptr<PointCloud2>& scan_old_poincloud, std::shared_ptr<PointCloud>& raw_pointcloud_out_, std::shared_ptr<pcl::PointCloud<PointXYZIRT>>& scan);
   bool Init();
 
  private:
   std::thread online_calibration_thread_;
-  bool CheckIsEnd(bool is_end);
+//   bool CheckIsEnd(bool is_end);
   void PublishRawPointCloud(int seq, std::shared_ptr<PointCloud2>& scan);
 
   bool inited_ = false;
@@ -53,11 +56,11 @@ class Parser {
   std::atomic<bool> running_ = {true};
 
  protected:
-  virtual void ParseRawPacket(const uint8_t* buf, const int len,
-                              bool* is_end) = 0;
+  // void ParseRawPacket(const uint8_t* buf, const int len, bool* is_end) = 0;
   void CheckPktTime(double time_sec);
   void ResetRawPointCloud();
-  void CalcPointXYZIT(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_);
+  //void CalcPointXYZIT(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_)
+  void CalcPointXYZIT(std::shared_ptr<pcl::PointCloud<PointXYZIRT>>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_);
 
   bool is_calibration_ = false;
   std::shared_ptr<::apollo::cyber::Node> node_;
@@ -73,14 +76,9 @@ class Parser {
   int last_azimuth_ = 0;
   int tz_second_ = 0;
   int start_angle_ = 0;
-  uint32_t max_packets_ = 1206;
-  uint32_t packet_nums_ = 0;
-
-  double elev_angle_map_[LASER_COUNT_L64] = {0};
-  double horizatal_azimuth_offset_map_[LASER_COUNT_L64] = {0};
 };
 
-}  // namespace hesai
+}  // namespace ls180s2_gazel
 }  // namespace drivers
 }  // namespace apollo
 

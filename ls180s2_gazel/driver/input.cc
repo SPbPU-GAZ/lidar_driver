@@ -18,10 +18,10 @@
 
 #include "input.h"
 
-extern volatile sig_atomic_t flag;
 namespace apollo {
 namespace drivers {
 namespace ls180s2_gazel {
+    volatile sig_atomic_t flag = 1;
     uint32_t PACKET_SIZE = 1206; //sizeof(LslidarMsgRawPacket->get_data());
 ////////////////////////////////////////////////////////////////////////
 // Input base class implementation
@@ -32,16 +32,27 @@ namespace ls180s2_gazel {
  *  @param private_nh ROS private handle for calling node.
  *  @param port UDP port number.
  */
+
+    static void my_handler(int sig) {
+        flag = 0;
+    }
+    
     Input::Input(const std::shared_ptr<::apollo::cyber::Node>& private_nh, uint32_t port) : private_nh_(private_nh), port_(port) {
+        AERROR << "41 Input::Input start line" << std::endl; 
+
         npkt_update_flag_ = false;
         cur_rpm_ = 0;
         return_mode_ = 1;
 
+        signal(SIGINT, my_handler);
 
         devip_str_ = conf_.devip_str();
         add_multicast = conf_.add_multicast();
         group_ip = conf_.group_ip();
+        AERROR << "52 Input::Input end line" << std::endl; 
     }
+
+    
 
     int Input::getRpm(void) {
         return cur_rpm_;
@@ -68,6 +79,7 @@ namespace ls180s2_gazel {
    *  @param port UDP port number
 */
     InputSocket::InputSocket(const std::shared_ptr<::apollo::cyber::Node>& private_nh, uint32_t port) : Input(private_nh, port) {
+        AERROR << "82 InputSocket::InputSocket start line" << std::endl; 
 
         sockfd_ = -1;
 
@@ -75,15 +87,15 @@ namespace ls180s2_gazel {
             inet_aton(devip_str_.c_str(), &devip_);
         }
 
-        AINFO << "Opening UDP socket port: " << port;
+        AERROR << "Opening UDP socket port: " << port;
         sockfd_ = socket(PF_INET, SOCK_DGRAM, 0); // Returns a file descriptor for the new socket, or -1 for errors
         if (sockfd_ == -1) {
-            perror("socket");  // TODO: ROS_ERROR errno
+            AERROR << "socket" << std::endl;;  // TODO: ROS_ERROR errno
             return;
         }
         int opt = 1;
         if (setsockopt(sockfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){ // socket settings
-            perror("setsockopt error!\n");
+            AERROR << "setsockopt error!" << std::endl;
             return;
         }
         sockaddr_in my_addr{};                   // my address information (sockaddr_in -> internet addres socket, sockaddr -> generic adress socket)
@@ -93,7 +105,7 @@ namespace ls180s2_gazel {
         my_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // automatically fill in my IP (check or bind this socket for all net cards in system)
 
         if (bind(sockfd_, (sockaddr *) &my_addr, sizeof(sockaddr)) == -1) {
-            perror("bind");  // TODO: ROS_ERROR errno
+            AERROR << "bind" << std::endl;  // TODO: ROS_ERROR errno
             return;
         }
         if (add_multicast) {
@@ -105,7 +117,7 @@ namespace ls180s2_gazel {
             //group.imr_interface.s_addr = inet_addr("192.168.1.102");
 
             if (setsockopt(sockfd_, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &group, sizeof(group)) < 0) {
-                perror("Adding multicast group error ");
+                AERROR << "Adding multicast group error " << std::endl;
                 close(sockfd_);
                 exit(1);
             } else
@@ -114,10 +126,10 @@ namespace ls180s2_gazel {
 
         // set the file status flags of a socket file descriptor (add non blocking read and write and async notifications then data available or events occur)
         if (fcntl(sockfd_, F_SETFL, O_NONBLOCK | FASYNC) < 0) { 
-            perror("non-block");
+            AERROR << "non-block" << std::endl;
             return;
         }
-
+        AERROR << "132 InputSocket::InputSocket end line" << std::endl; 
     }
 
 /** @brief destructor */
@@ -125,40 +137,50 @@ namespace ls180s2_gazel {
         (void) close(sockfd_);
     }
 
-    int InputSocket::getPacket(/*lslidar_msgs::LslidarChPacketPtr*/ LslidarMsgRawPacket &packet) {
+    int InputSocket::getPacket(LslidarRecvData &packet) {
+        AERROR << "141 InputSocket::getPacket start line" << std::endl; 
         struct pollfd fds[1];
         fds[0].fd = sockfd_;
         fds[0].events = POLLIN;
         static const int POLL_TIMEOUT = 3000; // one second (in msec)
+        // AERROR << "143 inside InputSocket::getPacket line" << std::endl;  
 
         sockaddr_in sender_address{};
         socklen_t sender_address_len = sizeof(sender_address);
         // --------------------------
-        auto x = packet.data(0);
+        // auto x = packet.data(0);
         // --------------------------
-        //while (true)
+        //while (true) 
+        // AERROR << "151 inside InputSocket::getPacket line" << std::endl;  
         while (flag == 1) {
+        // AERROR << "153 inside InputSocket::getPacket line" << std::endl;  
             // poll() until input available
             do {
+        // AERROR << "156 inside InputSocket::getPacket line" << std::endl;  
                 int retval = poll(fds, 1, POLL_TIMEOUT);
+        // AERROR << "158 inside InputSocket::getPacket line, retval:" << retval << std::endl;  
                 if (retval == 0)            // poll() timeout?
                 {
-                    AWARN << "lslidar poll() timeout, port:" << port_;
+                    AERROR << "lslidar poll() timeout, port:" << port_;
                     return 1;
                 }
+        // AERROR << "164 inside InputSocket::getPacket line" << std::endl;  
             } while ((fds[0].revents & POLLIN) == 0);
 
             // Receive packets that should now be available from the
             // socket using a blocking read.
-            ssize_t nbytes = recvfrom(sockfd_, &x, apollo::drivers::ls180s2_gazel::PACKET_SIZE, 0,
+        AERROR << "169 InputSocket::getPacket after poll line" << std::endl;  
+            ssize_t nbytes = recvfrom(sockfd_, &packet.data[0], apollo::drivers::ls180s2_gazel::PACKET_SIZE, 0,
                                       (sockaddr *) &sender_address, &sender_address_len);
+        // AERROR << "172 inside InputSocket::getPacket line" << std::endl;  
 
             if ((size_t) nbytes == apollo::drivers::ls180s2_gazel::PACKET_SIZE) {
+        // AERROR << "175 inside InputSocket::getPacket line" << std::endl;  
                 // read successful,
                 // if packet is not from the lidar scanner we selected by IP,
                 // continue otherwise we are done
                 if (devip_str_ != "" && sender_address.sin_addr.s_addr != devip_.s_addr) {
-                    AWARN << "lidar ip parameter error, please reset lidar ip in launch file";
+                    AERROR << "lidar ip parameter error, please reset lidar ip in launch file";
                     continue;
                 } else {
                     break; //done
@@ -168,7 +190,7 @@ namespace ls180s2_gazel {
         if (flag == 0) {
             abort();
         }
- 
+        AERROR << "181 InputSocket::getPacket end line" << std::endl;  
         return 0;
     }
 
@@ -178,6 +200,7 @@ namespace ls180s2_gazel {
                         bool read_once, bool read_fast, double repeat_delay) : Input(private_nh, port),
                                                                                 packet_rate_(packet_rate),
                                                                                 filename_(filename) {
+        AERROR << "203 InputPCAP::InputPCAP start line" << std::endl; 
         pcap_ = nullptr;
         empty_ = true;
         // private_nh.param("read_once", read_once_, false);
@@ -209,18 +232,20 @@ namespace ls180s2_gazel {
         }
         filter << "udp dst port " << port;
         pcap_compile(pcap_, &pcap_packet_filter_, filter.str().c_str(), 1, PCAP_NETMASK_UNKNOWN);
+        AERROR << "235 InputPCAP::InputPCAP end line" << std::endl; 
     }
 
     InputPCAP::~InputPCAP() {
         pcap_close(pcap_);
     }
 
-    int InputPCAP::getPacket(LslidarMsgRawPacket &pkt) {
+    int InputPCAP::getPacket(LslidarRecvData &pkt) {
+        AERROR << "243 InputPCAP::getPacket start line" << std::endl; 
         struct pcap_pkthdr *header;
         const u_char *pkt_data;
         static int count_frame= 0;
         // ------------------
-        auto y = pkt.data(0);
+        // auto y = pkt.data(0);
         // ------------------
         while (flag == 1) {
             int res;
@@ -235,15 +260,15 @@ namespace ls180s2_gazel {
                     packet_rate_.Sleep();
                 }
 
-                mempcpy(&y, pkt_data + 42, PACKET_SIZE);
-                if (pkt.data(0) == 0x00 && pkt.data(1) == 0xFF && pkt.data(2) == 0x00 &&
-                    pkt.data(3) == 0x5A) {
-                    int rpm = (pkt.data(8) << 8) | pkt_data[9];
+                mempcpy(&pkt.data[0], pkt_data + 42, PACKET_SIZE);
+                if (pkt.data[0] == 0x00 && pkt.data[1] == 0xFF && pkt.data[2] == 0x00 &&
+                    pkt.data[3] == 0x5A) {
+                    int rpm = (pkt.data[8] << 8) | pkt_data[9];
                     int mode = 1;
-                    if ((pkt.data(45) == 0x08 && pkt.data(46) == 0x02 && pkt.data(47) >= 0x09) ||
-                        (pkt.data(45) > 0x08) ||
-                        (pkt_data[45] == 0x08 && pkt.data(46) > 0x02)) {
-                        if (pkt.data(300) != 0x01 && pkt.data(300) != 0x02) {
+                    if ((pkt.data[45] == 0x08 && pkt.data[46] == 0x02 && pkt.data[47] >= 0x09) ||
+                        (pkt.data[45] > 0x08) ||
+                        (pkt_data[45] == 0x08 && pkt.data[46] > 0x02)) {
+                        if (pkt.data[300] != 0x01 && pkt.data[300] != 0x02) {
                             mode = 0;
                         }
 
@@ -254,7 +279,7 @@ namespace ls180s2_gazel {
                         npkt_update_flag_ = true;
                     }
                 }
-                pkt.set_stamp(apollo::cyber::Time().Now().ToNanosecond());
+                pkt.stamp = apollo::cyber::Time().Now().ToNanosecond();
                 //pkt->set_stamp(apollo::cyber::Time().Now().ToNanosecond());
                 empty_ = false;
                 return 0;
@@ -276,6 +301,7 @@ namespace ls180s2_gazel {
 //            ROS_INFO("replaying lslidar dump file");
             count_frame = 0;
         }
+        AERROR << "304 inside InputPCAP::getPacket almost end line" << std::endl; 
         if (flag == 0) {
             abort();
         }

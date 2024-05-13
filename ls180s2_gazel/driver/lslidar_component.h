@@ -18,7 +18,7 @@
 #include <string>
 #include "cyber/cyber.h"
 #include "cyber/component/component.h"
-#include "driver.h"
+#include "modules/drivers/lidar/ls180s2_gazel/driver/driver.h"
 
 #include "modules/drivers/lidar/proto/lslidar_config.pb.h"
 #include "modules/drivers/lidar/proto/config.pb.h"

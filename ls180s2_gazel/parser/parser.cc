@@ -26,12 +26,12 @@ namespace ls180s2_gazel {
 
 using apollo::drivers::PointCloud;
 
-Parser::Parser(const std::shared_ptr<::apollo::cyber::Node>& node,
-               const Config& conf)
-    : node_(node), conf_(conf) {
-  tz_second_ = conf_.time_zone() * 3600;
-  start_angle_ = static_cast<int>(conf_.start_angle() * 100);
-}
+// Parser::Parser(const std::shared_ptr<::apollo::cyber::Node>& node,
+//                const Config& conf)
+//     : node_(node), conf_(conf) {
+//   tz_second_ = 3 * 3600; // часовой пояс Питера +3. Не вижу смысла выделять под это параметр
+//   start_angle_ = static_cast<int>(conf_.start_angle() * 100);
+// }
 
 Parser::~Parser() { Stop(); }
 
@@ -41,24 +41,25 @@ bool Parser::Init() {
   }
 
   // init calibration
-  if (!conf_.is_online_calibration() && conf_.calibration_file() != "") {
-    if (!LoadCalibration(conf_.calibration_file().c_str())) {
-      AERROR << "load local calibration file[" << conf_.calibration_file()
-             << "] error";
-      return false;
-    }
-    is_calibration_ = true;
-  } else {
-    online_calibration_thread_ =
-        std::thread(&Parser::LoadCalibrationThread, this);
-  }
+
+  // if (!conf_.is_online_calibration() && conf_.calibration_file() != "") {
+  //   if (!LoadCalibration(conf_.calibration_file().c_str())) {
+  //     AERROR << "load local calibration file[" << conf_.calibration_file()
+  //            << "] error";
+  //     return false;
+  //   }
+  //   is_calibration_ = true;
+  // } else {
+  //   online_calibration_thread_ =
+  //       std::thread(&Parser::LoadCalibrationThread, this);
+  // }
 
   // init writer
   raw_pointcloud_writer_ =
-      node_->CreateWriter<PointCloud>(conf_.pointcloud_channel());
+      node_->CreateWriter<PointCloud>(conf_.pointcloud_topic_parsed());
 
   if (raw_pointcloud_writer_ == nullptr) {
-    AERROR << "create writer:" << conf_.pointcloud_channel()
+    AERROR << "create writer:" << conf_.pointcloud_topic_parsed()
            << " error, check cyber is init?";
     return false;
   }
@@ -86,31 +87,31 @@ void Parser::ResetRawPointCloud() {
   pool_index_ = (pool_index_ + 1) % pool_size_;
 }
 
-bool Parser::Parse(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointXYZIRT>& point_cloud_xyzirt_pub_) {
+bool Parser::Parse(std::shared_ptr<PointCloud2>& scan_old_poincloud, std::shared_ptr<PointCloud>& raw_pointcloud_out_, std::shared_ptr<pcl::PointCloud<PointXYZIRT>>& scan) {
   //ResetRawPointCloud();
-  ParseRawPacket(*scan, *point_cloud_xyzirt_pub_);
-  PublishRawPointCloud(scan->header().sequence_num());
+  CalcPointXYZIT(scan, raw_pointcloud_out_);
+  PublishRawPointCloud(scan_old_poincloud->header().seq(), scan_old_poincloud);
   return true;
 }
 
-bool Parser::CheckIsEnd(bool is_end) {
-  if (packet_nums_ >= max_packets_) {
-    AWARN << "over max packets, packets:" << packet_nums_
-          << ", max packets:" << max_packets_;
-    return true;
-  }
-  if (is_end && packet_nums_ < min_packets_) {
-    AWARN << "receive too less packets:" << packet_nums_ << ", not end"
-          << ", min packets:" << min_packets_;
-    return false;
-  }
-  return is_end;
-}
+// bool Parser::CheckIsEnd(bool is_end) {
+//   if (packet_nums_ >= max_packets_) {
+//     AWARN << "over max packets, packets:" << packet_nums_
+//           << ", max packets:" << max_packets_;
+//     return true;
+//   }
+//   if (is_end && packet_nums_ < min_packets_) {
+//     AWARN << "receive too less packets:" << packet_nums_ << ", not end"
+//           << ", min packets:" << min_packets_;
+//     return false;
+//   }
+//   return is_end;
+// }
 
 void Parser::PublishRawPointCloud(int seq, std::shared_ptr<PointCloud2>& scan) {
   int size = raw_pointcloud_out_->point_size();
   if (size == 0) {
-    AWARN << "All points size is NAN! Please check lslidar:" << conf_.model();
+    AWARN << "All points size is NAN! Please check lslidar";
     return;
   }
 
@@ -121,8 +122,8 @@ void Parser::PublishRawPointCloud(int seq, std::shared_ptr<PointCloud2>& scan) {
   raw_pointcloud_out_->mutable_header()->set_frame_id("lslidar");
   raw_pointcloud_out_->mutable_header()->set_timestamp_sec(
       cyber::Time().Now().ToSecond());
-  raw_pointcloud_out_->set_height(scan.height());
-  raw_pointcloud_out_->set_width(scan.width());
+  raw_pointcloud_out_->set_height(scan->height());
+  raw_pointcloud_out_->set_width(scan->width());
   const auto timestamp =
       raw_pointcloud_out_->point(static_cast<int>(size) - 1).timestamp();
   raw_pointcloud_out_->set_measurement_time(static_cast<double>(timestamp) /
@@ -140,33 +141,18 @@ void Parser::CheckPktTime(double time_sec) {
   }
 }
 
-void Parser::CalcPointXYZIT(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_) {
-  // Hesai40PBlock *block = &pkt->blocks[blockid];
-  // double unix_second = static_cast<double>(mktime(&pkt->t) + tz_second_);
-  // double timestamp = unix_second + (static_cast<double>(pkt->usec)) / 1000000.0;
-  // CheckPktTime(timestamp);
+//void Parser::CalcPointXYZIT(std::shared_ptr<PointCloud2>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_) {
+void Parser::CalcPointXYZIT(std::shared_ptr<pcl::PointCloud<PointXYZIRT>>& scan, std::shared_ptr<PointCloud>& raw_pointcloud_out_) {
 
-    //  double xyDistance =
-    //     unit.distance * cosf(degreeToRadian(elev_angle_map_[i]));
-    // float x = static_cast<float>(
-    //     xyDistance *
-    //     sinf(degreeToRadian(horizatal_azimuth_offset_map_[i] +
-    //                         (static_cast<double>(block->azimuth)) / 100.0)));
-    // float y = static_cast<float>(
-    //     xyDistance *
-    //     cosf(degreeToRadian(horizatal_azimuth_offset_map_[i] +
-    //                         (static_cast<double>(block->azimuth)) / 100.0)));
-    // float z = static_cast<float>(unit.distance *
-    //                              sinf(degreeToRadian(elev_angle_map_[i])));
-
-    PointXYZIT *new_point = raw_pointcloud_out_->add_point();
-    new_point->set_x(scan.x);
-    new_point->set_y(scan.y);
-    new_point->set_z(scan.z);
-    new_point->set_intensity(scan.intensity);
-    // ?
-    new_point->set_timestamp(scan.timestap);
+  for (int i = 0; sizeof(scan->points); i++){
+      PointXYZIT *new_point = raw_pointcloud_out_->add_point();
+      new_point->set_x(scan->points[i].x);
+      new_point->set_y(scan->points[i].y);
+      new_point->set_z(scan->points[i].z);
+      new_point->set_intensity(scan->points[i].intensity);
+      new_point->set_timestamp(scan->points[i].timestamp);
   }
+
 }
 
 }  // namespace ls180s2_gazel

@@ -1,8 +1,8 @@
 devip_str: "192.168.1.200"
 add_multicast: false
 group_ip: "224.1.1.2"
-msop_port: "2368"
-difop_port: "2369"
+msop_port: 2368
+difop_port: 2369
 packet_rate: 15000.0
 use_time_service: false
 min_range: 0.15
@@ -10,5 +10,6 @@ max_range: 1500.0
 scan_start_angle: -60
 scan_end_angle: 60
 frame_id: "laser_link"
-pointcloud_topic: "lslidar_point_cloud"
-packet_loss: false
+pointcloud_topic: "/apollo/sensor/lslidar_point_cloud"
+packet_loss: true
+pointcloud_topic_parsed: "/apollo/sensor/lslidar_point_cloud_parsed"

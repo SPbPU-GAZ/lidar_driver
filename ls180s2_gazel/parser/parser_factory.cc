@@ -26,7 +26,7 @@ using ::apollo::cyber::Node;
 Parser* ParserFactory::CreateParser(const std::shared_ptr<Node>& node,
                                     const Config& conf) {
 
-  return new Parser(node, conf);
+  return new Parser();
 
   AERROR << "Couldn't create parser for lslidar";
   return nullptr;

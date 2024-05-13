@@ -8,7 +8,7 @@ LSLIDAR_COPTS = ['-DMODULE_NAME=\\"ls180s2_gazel\\"']
 
 
 cc_library(
-    name = "parser_library",
+    name = "parser_base_library",
     srcs = [
         "parser.cc", 
         ],
@@ -20,6 +20,8 @@ cc_library(
         "//cyber",
         "//modules/drivers/lidar/proto:lslidar_proto_cc",
         "//modules/drivers/lidar/proto:lslidar_proto_config_cc",
+        "//modules/common_msgs/sensor_msgs:pointcloud_cc_proto",
+        "//modules/drivers/lidar/ls180s2_gazel/driver:lslidar_library",
         "@local_config_pcl//:pcl",
         "@eigen",
         ],
@@ -42,7 +44,7 @@ cc_library(
         "//cyber",
         "//modules/drivers/lidar/proto:lslidar_proto_cc",
         "//modules/drivers/lidar/proto:lslidar_proto_config_cc",
-        ":parser_library",
+        ":parser_base_library",
         "@eigen",
         ],
     linkopts = [
@@ -51,16 +53,16 @@ cc_library(
         ],
 )
 
-cc_binary(
-    name = "parser_binary.so",
-    linkshared = True,
-    linkstatic = True,
-    deps = [
-        "//cyber",
-        ":parser_library",
-        ":parser_factory_library",
-    ],
-)
+# cc_binary(
+#     name = "parser_binary.so",
+#     linkshared = True,
+#     linkstatic = True,
+#     deps = [
+#         "//cyber",
+#         ":parser_base_library",
+#         ":parser_factory_library",
+#     ],
+# )
 
 
 cpplint()

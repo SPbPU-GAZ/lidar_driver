@@ -6,19 +6,6 @@ package(default_visibility = ["//visibility:public"])
 
 LSLIDAR_COPTS = ['-DMODULE_NAME=\\"ls180s2_gazel\\"']
 
-# install(
-#     name = "install",
-#     library_dest = "ls180s2_gazel/lib",
-#     data_dest = "ls180s2_gazel",
-#     data = ["//modules/drivers:cyberfile.xml"],
-#     runtime_dest = "ls180s2_gazel/bin",
-#     targets = [
-#         ":lslidar_library",
-#         ":lslidar_binary",
-#     ],
-#     visibility = ["//visibility:public"],
-# )
-
 cc_library(
     name = "pcap_library",
     hdrs = [
@@ -40,7 +27,7 @@ cc_library(
     hdrs = [
         "input.h", 
         "driver.h", 
-        "ThreadPool.h"
+        "ThreadPool.h",
         ],
     copts = LSLIDAR_COPTS,
     deps = [
@@ -56,6 +43,7 @@ cc_library(
         "//modules/drivers/lidar/proto:velodyne_cc_proto",
         "//modules/drivers/lidar/proto:lidar_parameter_cc_proto",
         "//modules/drivers/lidar/proto:robosense_config_cc_proto",
+
         ":pcap_library",
         "@local_config_pcl//:pcl",
         "@eigen",
@@ -68,12 +56,8 @@ cc_library(
 
 cc_library(
     name = "driver",
-    srcs = [
-        "lslidar_component.cc", 
-        ],
-    hdrs = [
-        "lslidar_component.h"
-        ],
+    srcs = ["lslidar_component.cc"],
+    hdrs = ["lslidar_component.h"],
     copts = LSLIDAR_COPTS,
     deps = [
         "//cyber",
@@ -89,25 +73,16 @@ cc_library(
         "//modules/drivers/lidar/proto:velodyne_cc_proto",
         "//modules/drivers/lidar/proto:lidar_parameter_cc_proto",
         "//modules/drivers/lidar/proto:robosense_config_cc_proto",
+        
         ":pcap_library",
         "@local_config_pcl//:pcl",
         "@eigen",
         ],
+    alwayslink = True,
     linkopts = [
         "-lpthread",
         "-lpcap",
         ],
 )
-
-cc_binary(
-    name = "lslidar_binary.so",
-    linkshared = True,
-    linkstatic = True,
-    deps = [
-        "//cyber",
-        ":driver",
-    ],
-)
-
 
 cpplint()
