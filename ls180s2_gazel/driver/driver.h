@@ -42,12 +42,15 @@
 #include "modules/drivers/lidar/proto/lslidar_config.pb.h"
 #include "modules/drivers/lidar/common/driver_factory/driver_base.h"
 #include "modules/drivers/lidar/proto/config.pb.h"
+#include "modules/common_msgs/sensor_msgs/pointcloud.pb.h"
 #include <deque>
 #include <mutex>
 #include <iostream>
+#include <fstream>
 #include "ThreadPool.h"
 
 #include "modules/drivers/lidar/ls180s2_gazel/driver/input.h"
+// #include "modules/drivers/lidar/ls180s2_gazel/driver/pcl_conversions.h"
 
 namespace apollo {
 namespace drivers {
@@ -145,26 +148,168 @@ namespace ls180s2_gazel {
         bool setDevPort(LslidarSrvDevPort &req,
                          LslidarSrvResult &res);
 
-        template<typename T>
-        void convertPCLtoROSMsg(const pcl::PointCloud<T> &pcl_cloud, PointCloud2 &cloud, LslidarHeader &headerPointCloud2)
-        {
-            pcl::PCLPointCloud2 pcl_pc2;
-            pcl::toPCLPointCloud2(pcl_cloud, pcl_pc2);
+        // template<typename T>
+        // void convertPCLtoROSMsg(const pcl::PointCloud<T> &pcl_cloud, PointCloud2 &cloud, LslidarHeader &headerPointCloud2)
+        // {
+        //     pcl::PCLPointCloud2 pcl_pc2;
+        //     pcl::toPCLPointCloud2(pcl_cloud, pcl_pc2);
 
-            headerPointCloud2.set_stamp(pcl_cloud.header.stamp);
-            headerPointCloud2.set_frame_id(pcl_cloud.header.frame_id);
-            cloud.set_height(pcl_cloud.height);
-            cloud.set_width(pcl_cloud.width);
-            cloud.set_is_bigendian(false);
-            cloud.set_is_dense(pcl_cloud.is_dense);
-            cloud.set_point_step(sizeof(T));
-            cloud.set_row_step(cloud.point_step() * cloud.width());
-            for(size_t i = 0; i < pcl_pc2.data.size(); ++i){
-                cloud.set_data(i, static_cast<uint32_t>(pcl_pc2.data[i]));
-            }
-            //memcpy(&cloud.data[0], &pcl_pc2.data[0], pcl_pc2.data.size());
-        }
+        //     headerPointCloud2.set_stamp_sec(static_cast<uint32_t>(pcl_cloud.header.stamp));
+        //     headerPointCloud2.set_stamp_mil(static_cast<uint32_t>(pcl_cloud.header.stamp));
+        //     headerPointCloud2.set_frame_id(pcl_cloud.header.frame_id);
+        //     cloud.set_height(pcl_cloud.height);
+        //     cloud.set_width(pcl_cloud.width);
+        //     cloud.set_is_bigendian(false);
+        //     cloud.set_is_dense(pcl_cloud.is_dense);
+        //     cloud.set_point_step(sizeof(T));
+        //     cloud.set_row_step(cloud.point_step() * cloud.width());
+        //     for(size_t i = 0; i < pcl_pc2.data.size(); ++i){
+        //         cloud.set_data(i, static_cast<uint32_t>(pcl_pc2.data[i]));
+        //     }
+        //     //memcpy(&cloud.data[0], &pcl_pc2.data[0], pcl_pc2.data.size());
+        // }
         
+      template<typename T>
+      void converter(const pcl::PointCloud<T> &pcl_cloud, PointCloud2 &cloud_proto)
+      {
+        pcl::PCLPointCloud2 pcl_pc2;
+        pcl::toPCLPointCloud2(pcl_cloud, pcl_pc2);
+
+        cloud_proto.mutable_header()->set_stamp_mil(pcl_pc2.header.stamp);
+        cloud_proto.mutable_header()->set_stamp_sec(pcl_pc2.header.stamp / 1000);
+        cloud_proto.mutable_header()->set_frame_id(pcl_pc2.header.frame_id);
+        cloud_proto.set_height(pcl_pc2.height);
+        cloud_proto.set_width(pcl_pc2.width);
+
+        for (const auto &field : pcl_pc2.fields)
+        {
+            auto* field_proto = cloud_proto.add_fields();
+            field_proto->set_name(field.name);
+            field_proto->set_offset(field.offset);
+            field_proto->set_datatype(field.datatype);
+            field_proto->set_count(field.count);
+        }
+
+        cloud_proto.set_is_bigendian(pcl_pc2.is_bigendian);
+        cloud_proto.set_point_step(pcl_pc2.point_step);
+        cloud_proto.set_row_step(pcl_pc2.row_step);
+        cloud_proto.set_is_dense(pcl_pc2.is_dense);
+
+
+        for (size_t i = 0; i < pcl_pc2.data.size(); ++i) {
+            //AERROR << std::endl << std::endl << "data: " << static_cast<uint32_t>pcl_pc2.data[i] << std::endl << std::endl;
+            cloud_proto.add_data(pcl_pc2.data[i]);
+        }
+      }
+
+        bool convert_PointCloud(std::shared_ptr<apollo::drivers::PointCloud> proto,
+                        PointCloud2 &rawdata) {
+            auto header = proto->mutable_header();
+            header->set_timestamp_sec(rawdata.header().stamp_sec());
+            header->set_frame_id(rawdata.header().frame_id());
+            header->set_sequence_num(rawdata.header().seq());
+            proto->set_frame_id(rawdata.header().frame_id());
+            proto->set_measurement_time(rawdata.header().stamp_sec());
+            proto->set_width(rawdata.width());
+            proto->set_height(rawdata.height());
+
+            int x_offset = -1;
+            int y_offset = -1;
+            int z_offset = -1;
+            int stamp_offset = -1;
+            int intensity_offset = -1;
+            for (const auto &field : rawdata.fields()) {
+                if (field.name() == "x") {
+                x_offset = field.offset();
+                } else if (field.name() == "y") {
+                y_offset = field.offset();
+                } else if (field.name() == "z") {
+                z_offset = field.offset();
+                } else if (field.name() == "timestamp") {
+                stamp_offset = field.offset();
+                } else if (field.name() == "intensity") {
+                intensity_offset = field.offset();
+                }
+            }
+
+            if (x_offset == -1 || y_offset == -1 || z_offset == -1 ||
+                stamp_offset == -1 || intensity_offset == -1) {
+                std::cerr << "Field not contains x, y, z, timestamp, instensity"
+                        << std::endl;
+                return false;
+            }
+
+            int total = rawdata.width() * rawdata.height();
+            auto data = rawdata.data();
+            for (int i = 0; i < total; ++i) {
+                auto cyber_point = proto->add_point();
+                int offset = i * rawdata.point_step();
+                cyber_point->set_x(*reinterpret_cast<float *>(&data[offset + x_offset]));
+                cyber_point->set_y(*reinterpret_cast<float *>(&data[offset + y_offset]));
+                cyber_point->set_z(*reinterpret_cast<float *>(&data[offset + z_offset]));
+                cyber_point->set_intensity(
+                    *reinterpret_cast<uint8_t *>(&data[offset + intensity_offset]));
+                cyber_point->set_timestamp(static_cast<std::uint64_t>(
+                    *reinterpret_cast<double *>(&data[offset + stamp_offset]) * 1e9));
+            }
+
+            return true;
+        }
+
+        // bool convert_PointCloud(std::shared_ptr<apollo::drivers::PointCloud> proto,
+        //                 std::shared_ptr<PointCloud2> &rawdata) {
+        //     auto header = proto->mutable_header();
+        //     header->set_timestamp_sec(rawdata->header().stamp_sec());
+        //     header->set_frame_id(rawdata->header().frame_id());
+        //     header->set_sequence_num(rawdata->header().seq());
+        //     proto->set_frame_id(rawdata->header().frame_id());
+        //     proto->set_measurement_time(rawdata->header().stamp_sec());
+        //     proto->set_width(rawdata->width());
+        //     proto->set_height(rawdata->height());
+
+        //     int x_offset = -1;
+        //     int y_offset = -1;
+        //     int z_offset = -1;
+        //     int stamp_offset = -1;
+        //     int intensity_offset = -1;
+        //     for (const auto &field : rawdata->fields()) {
+        //         if (field.name() == "x") {
+        //         x_offset = field.offset();
+        //         } else if (field.name() == "y") {
+        //         y_offset = field.offset();
+        //         } else if (field.name() == "z") {
+        //         z_offset = field.offset();
+        //         } else if (field.name() == "timestamp") {
+        //         stamp_offset = field.offset();
+        //         } else if (field.name() == "intensity") {
+        //         intensity_offset = field.offset();
+        //         }
+        //     }
+
+        //     if (x_offset == -1 || y_offset == -1 || z_offset == -1 ||
+        //         stamp_offset == -1 || intensity_offset == -1) {
+        //         std::cerr << "Field not contains x, y, z, timestamp, instensity"
+        //                 << std::endl;
+        //         return false;
+        //     }
+
+        //     int total = rawdata->width() * rawdata->height();
+        //     auto data = rawdata->data();
+        //     for (int i = 0; i < total; ++i) {
+        //         auto cyber_point = proto->add_point();
+        //         int offset = i * rawdata->point_step();
+        //         cyber_point->set_x(*reinterpret_cast<float *>(&data[offset + x_offset]));
+        //         cyber_point->set_y(*reinterpret_cast<float *>(&data[offset + y_offset]));
+        //         cyber_point->set_z(*reinterpret_cast<float *>(&data[offset + z_offset]));
+        //         cyber_point->set_intensity(
+        //             *reinterpret_cast<uint8_t *>(&data[offset + intensity_offset]));
+        //         cyber_point->set_timestamp(static_cast<std::uint64_t>(
+        //             *reinterpret_cast<double *>(&data[offset + stamp_offset]) * 1e9));
+        //     }
+
+        //     return true;
+        // }
+
         // ROS related variables
         std::shared_ptr<::apollo::cyber::Node> node_ = nullptr;
         Config conf_;
@@ -228,7 +373,8 @@ namespace ls180s2_gazel {
         std::mutex pc_mutex_;
         
         std::string pointcloud_topic;
-        std::shared_ptr<apollo::cyber::Writer<PointCloud2>> point_cloud_pub;                      
+        std::shared_ptr<apollo::cyber::Writer<PointCloud2>> point_cloud_pub;      
+        std::shared_ptr<apollo::cyber::Writer<PointCloud>> point_cloud_final;                   
         std::shared_ptr<apollo::cyber::Writer<INT64>> packet_loss_pub;                      
         std::shared_ptr<apollo::cyber::Service<LslidarSrvFrameRate, LslidarSrvResult>> frame_rate_service_;              
         std::shared_ptr<apollo::cyber::Service<LslidarSrvDataIp, LslidarSrvResult>> data_ip_service_;                   

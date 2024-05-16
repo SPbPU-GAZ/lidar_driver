@@ -60,11 +60,13 @@ namespace ls180s2_gazel {
 
     typedef struct LslidarRecvData{
         uint32_t seq;
-        uint64_t header_stamp;
+        uint32_t header_stamp_sec;
+        uint32_t header_stamp_mil;
         std::string frame_id;
-        uint64_t stamp;
+        uint32_t stamp_sec;
+        uint32_t stamp_mil;
         double   prism_angle[4];
-        uint32_t data[1206];
+        uint8_t data[1206];
     } LslidarRecvData;
     
 

@@ -147,24 +147,16 @@ namespace ls180s2_gazel {
 
         sockaddr_in sender_address{};
         socklen_t sender_address_len = sizeof(sender_address);
-        // --------------------------
-        // auto x = packet.data(0);
-        // --------------------------
         //while (true) 
-        // AERROR << "151 inside InputSocket::getPacket line" << std::endl;  
         while (flag == 1) {
-        // AERROR << "153 inside InputSocket::getPacket line" << std::endl;  
             // poll() until input available
             do {
-        // AERROR << "156 inside InputSocket::getPacket line" << std::endl;  
-                int retval = poll(fds, 1, POLL_TIMEOUT);
-        // AERROR << "158 inside InputSocket::getPacket line, retval:" << retval << std::endl;  
+                int retval = poll(fds, 1, POLL_TIMEOUT); 
                 if (retval == 0)            // poll() timeout?
                 {
                     AERROR << "lslidar poll() timeout, port:" << port_;
                     return 1;
-                }
-        // AERROR << "164 inside InputSocket::getPacket line" << std::endl;  
+                }  
             } while ((fds[0].revents & POLLIN) == 0);
 
             // Receive packets that should now be available from the
@@ -172,10 +164,8 @@ namespace ls180s2_gazel {
         AERROR << "169 InputSocket::getPacket after poll line" << std::endl;  
             ssize_t nbytes = recvfrom(sockfd_, &packet.data[0], apollo::drivers::ls180s2_gazel::PACKET_SIZE, 0,
                                       (sockaddr *) &sender_address, &sender_address_len);
-        // AERROR << "172 inside InputSocket::getPacket line" << std::endl;  
 
             if ((size_t) nbytes == apollo::drivers::ls180s2_gazel::PACKET_SIZE) {
-        // AERROR << "175 inside InputSocket::getPacket line" << std::endl;  
                 // read successful,
                 // if packet is not from the lidar scanner we selected by IP,
                 // continue otherwise we are done
@@ -279,7 +269,8 @@ namespace ls180s2_gazel {
                         npkt_update_flag_ = true;
                     }
                 }
-                pkt.stamp = apollo::cyber::Time().Now().ToNanosecond();
+                pkt.stamp_sec = apollo::cyber::Time().Now().ToNanosecond();
+                pkt.stamp_mil = apollo::cyber::Time().Now().ToSecond();
                 //pkt->set_stamp(apollo::cyber::Time().Now().ToNanosecond());
                 empty_ = false;
                 return 0;

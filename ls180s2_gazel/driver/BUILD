@@ -28,6 +28,7 @@ cc_library(
         "input.h", 
         "driver.h", 
         "ThreadPool.h",
+        #"pcl_conversions.h",
         ],
     copts = LSLIDAR_COPTS,
     deps = [
@@ -35,6 +36,7 @@ cc_library(
         "//modules/drivers/lidar/proto:lslidar_proto_cc",
         "//modules/drivers/lidar/proto:lslidar_proto_config_cc",
         "//modules/drivers/lidar/common/driver_factory:driver_base",
+        "//modules/common_msgs/sensor_msgs:pointcloud_cc_proto",
         
         "//modules/drivers/lidar/proto:config_cc_proto",
         "//modules/drivers/lidar/proto:hesai_config_cc_proto",
@@ -65,6 +67,7 @@ cc_library(
         "//modules/drivers/lidar/proto:lslidar_proto_cc",
         "//modules/drivers/lidar/proto:lslidar_proto_config_cc",
         "//modules/drivers/lidar/common/driver_factory:driver_base",
+        "//modules/common_msgs/sensor_msgs:pointcloud_cc_proto",
 
         "//modules/drivers/lidar/proto:config_cc_proto",
         "//modules/drivers/lidar/proto:hesai_config_cc_proto",

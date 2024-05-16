@@ -30,47 +30,6 @@ namespace ls180s2_gazel {
     double sin30 = sin(DEG2RAD(30));
     double sin60 = sin(DEG2RAD(60));
     double cos30 = cos(DEG2RAD(30));
-    // LslidarChDriver::LslidarChDriver() :
-
-    //     socket_id(-1),
-    //     min_range(0.15),
-    //     max_range(200),
-    //     packet_rate(11111.0),
-    //     packet_end_time(0.0),
-    //     current_packet_time(0.0),
-    //     last_packet_time(0.0),
-    //     use_time_service(false),
-    //     return_mode(1),
-    //     g_fAngleAcc_V(0.01),
-    //     packet_loss(false),
-    //     is_add_frame_(false),
-    //     get_ms06_param(true),
-    //     is_get_difop_(false), 
-    //     last_packet_number_(-1), 
-    //     current_packet_number_(0), 
-    //     total_packet_loss_(0),
-    //     frame_count(0),
-    //     threadPool_(std::make_unique<ThreadPool>(2)),
-    //     point_cloud_xyzirt_(new pcl::PointCloud<VPoint>),
-    //     point_cloud_xyzirt_bak_(new pcl::PointCloud<VPoint>),
-    //     point_cloud_xyzirt_pub_(new pcl::PointCloud<VPoint>){
-
-    //     node_ = apollo::cyber::CreateNode("lslidar_node", "");
-
-    //     // create the sin and cos table for different azimuth and vertical values
-    //     for (int j = 0; j < 36000; ++j) {
-    //         double angle = static_cast<double>(j) * 0.01 * 0.017453293;
-    //         sin_table[j] = sin(angle);
-    //         cos_table[j] = cos(angle);
-    //     }
-
-    //     //double mirror_angle[4] = {0, -2, -1, -3};   //摆镜角度   //根据通道不同偏移角度不同
-    //     double mirror_angle[4] = {1.5, -0.5, 0.5, -1.5};   //摆镜角度   //根据通道不同偏移角度不同
-    //     for (int i = 0; i < 4; ++i) {
-    //         cos_mirror_angle[i] = cos(DEG2RAD(mirror_angle[i]));
-    //         sin_mirror_angle[i] = sin(DEG2RAD(mirror_angle[i]));
-    //     }
-    // }
 
     LslidarChDriver::LslidarChDriver(const std::shared_ptr<::apollo::cyber::Node>& node,
                     const ::apollo::drivers::ls180s2_gazel::Config& conf) :
@@ -188,28 +147,12 @@ namespace ls180s2_gazel {
         use_time_service = conf_.use_time_service();
         packet_loss = conf_.packet_loss();
         
-        AERROR << "dump_file " << dump_file << std::endl;
-        AERROR << "packet_rate " << packet_rate << std::endl;
-        AERROR << "lidar_ip_string " << lidar_ip_string << std::endl;
-        AERROR << "msop_udp_port " << msop_udp_port << std::endl;
-        AERROR << "difop_udp_port " << difop_udp_port << std::endl;
-        AERROR << "add_multicast " << add_multicast << std::endl;
-        AERROR << "group_ip_string " << group_ip_string << std::endl;
-        AERROR << "min_range " << min_range << std::endl;
-        AERROR << "max_range " << max_range << std::endl;
-        AERROR << "scan_start_angle " << scan_start_angle << std::endl;
-        AERROR << "scan_end_angle " << scan_end_angle << std::endl;
-        AERROR << "frame_id " << frame_id << std::endl;
-        AERROR << "pointcloud_topic " << pointcloud_topic << std::endl;
-        AERROR << "use_time_service " << use_time_service << std::endl;
-        AERROR << "packet_loss " << packet_loss << std::endl;
-
         AINFO << "Using time service or not: " << use_time_service;
         AINFO << "Is packet loss detection enabled: " << packet_loss;
         //inet_aton(lidar_ip_string.c_str(), &lidar_ip);
-        AERROR << "Only accepting packets from IP address: " << lidar_ip_string.c_str();
+        AINFO << "Only accepting packets from IP address: " << lidar_ip_string.c_str();
         if (add_multicast) 
-            AERROR << "Opening UDP socket: group_address " << group_ip_string;
+            AINFO << "Opening UDP socket: group_address " << group_ip_string;
 
         AERROR << "214 LslidarChDriver::loadParameters end line" << std::endl;
         return true;
@@ -218,6 +161,7 @@ namespace ls180s2_gazel {
     bool LslidarChDriver::createCyberIO() {
         AERROR << "219 LslidarChDriver::createCyberIO start line" << std::endl;
         point_cloud_pub = node_->CreateWriter<PointCloud2>(pointcloud_topic);
+        point_cloud_final = node_->CreateWriter<PointCloud>("/apollo/sensor/lslidar_point_cloud_parsed");
         if (packet_loss){
             packet_loss_pub = node_->CreateWriter<INT64>("packet_loss");
         }
@@ -480,6 +424,7 @@ namespace ls180s2_gazel {
 
         // Since the lslidar delivers data at a very high rate, keep
         // reading and publishing scans as fast as possible.
+        
         while (true) {
             // keep reading until full packet received
             int rc = msop_input_->getPacket(*packet_struct);
@@ -488,23 +433,19 @@ namespace ls180s2_gazel {
             }
             if (rc < 0) return false; // end of file reached?
         }
-        while (sizeof(packet_struct->data) < packet_size_proto_check) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
 
         headerLslidarRawPacket->set_seq(packet_struct->seq);
-        headerLslidarRawPacket->set_stamp(packet_struct->header_stamp);
+        headerLslidarRawPacket->set_stamp_mil(packet_struct->header_stamp_mil);
+        headerLslidarRawPacket->set_stamp_sec(packet_struct->header_stamp_sec);
         headerLslidarRawPacket->set_frame_id(packet_struct->frame_id);
-        packet->set_stamp(packet_struct->stamp);
-        // packet->set_prism_angle(packet_struct->prism_angle);
-        // packet->set_data(packet_struct->data);
-        for (unsigned int i = 0; i < 4; i++){
+        packet->set_stamp_sec(packet_struct->stamp_sec);
+        packet->set_stamp_mil(packet_struct->stamp_mil);
+        for (unsigned int i = 0; i < sizeof(packet_struct->prism_angle) / 8; i++){
             packet->set_prism_angle(i, packet_struct->prism_angle[i]);
         }
-        for (unsigned int i = 0; i < 1206; i++){
+        for (unsigned int i = 0; i < sizeof(packet_struct->data); i++){
             packet->set_data(i, packet_struct->data[i]);
         }
-        AERROR << std::endl << "510 after data init " << std::endl;
 
         // publish message using time of last packet read
 
@@ -521,7 +462,8 @@ namespace ls180s2_gazel {
                 uint32_t timestamp_nsce = (pkt->data(1200) << 24) + (pkt->data(1201) << 16) +
                                           (pkt->data(1202) << 8) + (pkt->data(1203));
                 timeStamp = apollo::cyber::Time(timestamp_s, timestamp_nsce);// s,ns
-                headerLslidarRawPkt->set_stamp(timeStamp.ToNanosecond());
+                headerLslidarRawPkt->set_stamp_mil(timeStamp.ToNanosecond());
+                headerLslidarRawPkt->set_stamp_sec(timeStamp.ToSecond());
                 //packet->header.stamp = timeStamp;             // packet->header.stamp = timeStamp;
                 current_packet_time = timeStamp.ToSecond();     // packet->header.stamp.toSec();
             } else {          //gps授时
@@ -544,18 +486,37 @@ namespace ls180s2_gazel {
                 packet_timestamp = pkt->data(1203) +
                                    (pkt->data(1202) << 8) +
                                    (pkt->data(1201) << 16) +
-                                   (pkt->data(1200) << 24); //ns
-                timeStamp = apollo::cyber::Time(this->pointcloudTimeStamp, packet_timestamp);// s,ns
-                headerLslidarRawPacket->set_stamp(timeStamp.ToNanosecond());     // packet->header.stamp = timeStamp;
+                                   (pkt->data(1200) << 24); //ns                           TIME IS DIFFERENT HERE
+                timeStamp = apollo::cyber::Time(this->pointcloudTimeStamp, packet_timestamp);
+                headerLslidarRawPacket->set_stamp_mil(timeStamp.ToNanosecond());
+                headerLslidarRawPacket->set_stamp_sec(timeStamp.ToSecond());
                 current_packet_time = timeStamp.ToSecond();       // packet->header.stamp.toSec();
             }
         } else {
             AERROR << std::endl << "515 inside else use_time_service " << std::endl;
             // packet->header.stamp = apollo::cyber::Time::now();
             // current_packet_time = packet->header.stamp.toSec();
-            headerLslidarRawPacket->set_stamp(apollo::cyber::Time::Now().ToSecond());
+            headerLslidarRawPacket->set_stamp_sec(apollo::cyber::Time::Now().ToSecond());
+            headerLslidarRawPacket->set_stamp_mil(apollo::cyber::Time::Now().ToNanosecond());
             current_packet_time = apollo::cyber::Time::Now().ToSecond();
         }
+
+        // AERROR << "BEFORE FILE" << std::endl;
+        // std::time_t now = std::time(nullptr);
+        // std::stringstream filename;
+        // filename << "/apollo/modules/drivers/lidar/ls180s2_gazel/driver/data_" << now << ".txt";
+        // std::ofstream file(filename.str());
+        // if (file.is_open()){
+        //     for (int i = 0; i < 1206; i++){
+        //         if (i < 1205){
+        //             file << "index: " << i << "value: " << packet->data(i) << std::endl;
+        //         }else{
+        //             file << "index: " << i << "value: " << packet->data(i) << "LAST ONE" << std::endl << std::endl;
+        //         }
+        //     }
+        // }
+        // file.close();
+        // AERROR << "AFTER FILE" << std::endl;
 
         lslidarChPacketProcess(packet);
         AERROR << "554 LslidarChDriver::polling end line " << std::endl;
@@ -575,16 +536,41 @@ namespace ls180s2_gazel {
     void LslidarChDriver::difopPoll() {
         AERROR << "569 LslidarChDriver::difopPoll start line " << std::endl;
         //LslidarMsgRawPacket difop_packet(new LslidarMsgRawPacket());
-        LslidarMsgRawPacket* difop_packet = new LslidarMsgRawPacket();
+        std::shared_ptr<LslidarMsgRawPacket> difop_packet = std::make_shared<LslidarMsgRawPacket>();
         std::shared_ptr<LslidarRecvData> difop_packet_recv = std::make_shared<LslidarRecvData>();
+        LslidarHeader* headerLslidarRawPacketDifop = difop_packet->mutable_header();
+
+        difop_packet->mutable_prism_angle()->Resize(4, 0.0);
+        difop_packet->mutable_data()->Resize(1206, 0);
+
+
         // reading and publishing scans as fast as possible.
         while (apollo::cyber::OK()) { // ros::ok()
             // keep reading
             int rc = difop_input_->getPacket(*difop_packet_recv);
+            
+            headerLslidarRawPacketDifop->set_seq(difop_packet_recv->seq);
+            headerLslidarRawPacketDifop->set_stamp_mil(difop_packet_recv->header_stamp_mil);
+            headerLslidarRawPacketDifop->set_stamp_sec(difop_packet_recv->header_stamp_sec);
+            headerLslidarRawPacketDifop->set_frame_id(difop_packet_recv->frame_id);
+            difop_packet->set_stamp_mil(difop_packet_recv->stamp_mil);
+            difop_packet->set_stamp_sec(difop_packet_recv->stamp_sec);
+            for (unsigned int i = 0; i < sizeof(difop_packet_recv->prism_angle) / 8; i++){
+                difop_packet->set_prism_angle(i, difop_packet_recv->prism_angle[i]);
+            }
+            for (unsigned int i = 0; i < sizeof(difop_packet_recv->data); i++){
+                difop_packet->set_data(i, difop_packet_recv->data[i]);
+            }
+
             if (rc == 0) {
+
+                AERROR << std::endl << std::endl << "difop_packet->data(0) " << difop_packet->data(0) << " difop_packet->data(1) " << difop_packet->data(1) << " difop_packet->data(2) " << difop_packet->data(2) << " difop_packet->data(3) " << difop_packet->data(3) << std::endl << std::endl;
                 if (difop_packet->data(0) == 0x00 || difop_packet->data(0) == 0xa5) {
                     if (difop_packet->data(1) == 0xff && difop_packet->data(2) == 0x00 &&
                         difop_packet->data(3) == 0x5a) {
+
+                        AERROR << std::endl << std::endl << "difop_packet->data(231) " << difop_packet->data(231) << std::endl << std::endl;
+
                         if (difop_packet->data(231) == 64 || difop_packet->data(231) == 65) {
                             is_add_frame_ = true;
                         }
@@ -647,16 +633,20 @@ namespace ls180s2_gazel {
         point_cloud_xyzirt_pub_->header.frame_id = frame_id;
         point_cloud_xyzirt_pub_->height = 1;
         PointCloud2 pc_msg;
+        std::shared_ptr<PointCloud> apollo_msg = std::make_shared<PointCloud>();
         LslidarHeader* headerPointCloud2 = pc_msg.mutable_header();
-        LslidarChDriver::convertPCLtoROSMsg(*point_cloud_xyzirt_pub_, pc_msg, *headerPointCloud2); // possible problem
-        headerPointCloud2->set_stamp(packet_timeStamp);  // pc_msg.header.stamp = packet_timeStamp; // quetinable but will try
+        // LslidarChDriver::convertPCLtoROSMsg(*point_cloud_xyzirt_pub_, pc_msg, *headerPointCloud2); // possible problem
+        converter(*point_cloud_xyzirt_pub_, pc_msg);
+        convert_PointCloud(apollo_msg, pc_msg);
+        headerPointCloud2->set_stamp_mil(packet_timeStamp);  // pc_msg.header.stamp = packet_timeStamp; // quetinable but will try
         point_cloud_pub->Write(pc_msg);
+        point_cloud_final->Write(apollo_msg);
         AERROR << "pointcloud size: " << pc_msg.width();
         AERROR << "648 LslidarChDriver::publishPointCloudNew end line " << std::endl;
     }
 
     int LslidarChDriver::convertCoordinate(const struct Firing &lidardata) {
-        AERROR << "652 LslidarChDriver::convertCoordinate start line " << std::endl;
+        //AERROR << "652 LslidarChDriver::convertCoordinate start line " << std::endl;
         double fAngle_H = 0.0;         //水平角度
         double fAngle_V = 0.0;         // 垂直角度
         fAngle_H = lidardata.azimuth;
@@ -714,7 +704,7 @@ namespace ls180s2_gazel {
 
         point_cloud_xyzirt_bak_->points.push_back(point);
         ++point_cloud_xyzirt_bak_->width;
-        AERROR << "710 LslidarChDriver::convertCoordinate end line " << std::endl;
+        //AERROR << "710 LslidarChDriver::convertCoordinate end line " << std::endl;
         return 0;
     }
 
@@ -723,8 +713,8 @@ namespace ls180s2_gazel {
         struct Firing lidardata{};
         // Convert the msg to the raw packet type.
         //apollo::cyber::Time(timestamp).ToSecond();
-        packet_timeStamp = msg->header().stamp();
-        packet_end_time = apollo::cyber::Time(msg->header().stamp()).ToSecond();
+        packet_timeStamp = msg->header().stamp_mil();
+        packet_end_time = apollo::cyber::Time(static_cast<int>(msg->header().stamp_mil())).ToSecond();
         bool packetType = false;
         if (msg->data(1205) == 0x02) {
             return_mode = 2;
@@ -758,13 +748,19 @@ namespace ls180s2_gazel {
                 }
                 last_packet_number_ = tmp_packet_number_;
             }
-
             double packet_interval_time =
                     (current_packet_time - last_packet_time) / (POINTS_PER_PACKET_SINGLE_ECHO / 8.0);
             for (size_t point_idx = 0; point_idx < POINTS_PER_PACKET_SINGLE_ECHO; point_idx += 8) {
+                
+                // AERROR << std::endl << std::endl << " msg->data(point_idx) " << msg->data(point_idx) << 
+                // " msg->data(point_idx + 1) " << msg->data(point_idx + 1) << " msg->data(point_idx + 2) " << 
+                // msg->data(point_idx + 2)  << " msg->data(point_idx + 3) " << msg->data(point_idx + 3) << 
+                // " msg->data(point_idx + 4) " << msg->data(point_idx + 4) << std::endl << std::endl;
+
                 if ((msg->data(point_idx) == 0xff) && (msg->data(point_idx + 1) == 0xaa) &&
                     (msg->data(point_idx + 2) == 0xbb) && (msg->data(point_idx + 3) == 0xcc) &&
                     (msg->data(point_idx + 4) == 0xdd)) {
+                    AERROR << std::endl << std::endl << std::endl << "packedType is true" << std::endl << std::endl << std::endl;
                     packetType = true;
                     frame_count++;
                 } else {
@@ -801,21 +797,29 @@ namespace ls180s2_gazel {
                         int iAngle_Hight = iTempAngle & 0x3f;
                         fAngle_V = msg->data(point_idx + 3) + (iAngle_Hight << 8);
                     }
-
                     lidardata.vertical_angle = fAngle_V * g_fAngleAcc_V;
                     if ((lidardata.azimuth < scan_start_angle) || (lidardata.azimuth > scan_end_angle)) continue;
                     lidardata.channel_number = iChannelNumber;
+                    // AERROR << "804 before lidardata.distance" << std::endl;
                     lidardata.distance = ((msg->data(point_idx + 4) << 16) + (msg->data(point_idx + 5) << 8) +
                                         msg->data(point_idx + 6));
+                    // AERROR << "807 !isPointInRange   " << lidardata.distance <<  std::endl;
+
+                    // AERROR << "809 lidardata.vertical_angle   " << lidardata.vertical_angle <<  std::endl;
+                    // AERROR << "810 lidardata.channel_number   " << lidardata.channel_number <<  std::endl;
+                    // AERROR << "811 lidardata.distance   "       << lidardata.distance       <<  std::endl;
+                    
                     if (!isPointInRange(lidardata.distance * g_fDistanceAcc)) continue;
+                    // AERROR << "809 after isPointInRange" << std::endl;
                     lidardata.intensity = msg->data(point_idx + 7);
                     lidardata.time = point_time;
                     lidardata.azimuth = fAngle_H * 0.01;
                     convertCoordinate(lidardata);
                 }
-
+                //AERROR << "837 packetType before Write" << std::endl;
                 if (packetType) {
                     if (is_add_frame_) {
+                        AERROR << "840 is_add_frame_" << std::endl;
                         if (frame_count >= 2) {
                             {
                                 std::unique_lock<std::mutex> lock(pc_mutex_);
@@ -827,6 +831,7 @@ namespace ls180s2_gazel {
                         point_cloud_xyzirt_ = point_cloud_xyzirt_bak_;
                         point_cloud_xyzirt_bak_.reset(new pcl::PointCloud<VPoint>);
                     } else {
+                        AERROR << "852 not is_add_frame_" << std::endl;
                         {
                             std::unique_lock<std::mutex> lock(pc_mutex_);
                             point_cloud_xyzirt_pub_ = point_cloud_xyzirt_;
@@ -837,6 +842,7 @@ namespace ls180s2_gazel {
                         point_cloud_xyzirt_bak_.reset(new pcl::PointCloud<VPoint>);
                     }
                 }
+                //AERROR << "861 packetType after Write" << std::endl;
             }
         } else {
             if (packet_loss){
@@ -852,9 +858,9 @@ namespace ls180s2_gazel {
                 }
                 last_packet_number_ = current_packet_number_;
             }
-
             double packet_interval_time =
                     (current_packet_time - last_packet_time) / (POINTS_PER_PACKET_DOUBLE_ECHO / 12.0);
+            AERROR << "761 before for (size_t point_idx = 0; point_idx < POINTS_PER_PACKET_DOUBLE_ECHO; point_idx += 12)" << std::endl;
             for (size_t point_idx = 0; point_idx < POINTS_PER_PACKET_DOUBLE_ECHO; point_idx += 12) {
                 if ((msg->data(point_idx) == 0xff) && (msg->data(point_idx + 1) == 0xaa) &&
                     (msg->data(point_idx + 2) == 0xbb) && (msg->data(point_idx + 3) == 0xcc) &&
@@ -913,7 +919,7 @@ namespace ls180s2_gazel {
                     lidardata.time = point_time;
                     convertCoordinate(lidardata);  // 第二个点
                 }
-
+                AERROR << "914 packetType before Write" << std::endl;
                 if (packetType) {
                     if (is_add_frame_) {
                         if (frame_count >= 2) {
@@ -940,12 +946,12 @@ namespace ls180s2_gazel {
             }
         }
         last_packet_time = current_packet_time;
-        AERROR << "715 LslidarChDriver::lslidarChPacketProcess end line " << std::endl;
+        AERROR << "941 LslidarChDriver::lslidarChPacketProcess end line " << std::endl;
         return true;
     }
 
     void LslidarChDriver::setPacketHeader(unsigned char *config_data) {
-        AERROR << "941 LslidarChDriver::setPacketHeader start line " << std::endl;
+        AERROR << "946 LslidarChDriver::setPacketHeader start line " << std::endl;
         config_data[0] = 0xAA;
         config_data[1] = 0x00;
         config_data[2] = 0xFF;
@@ -954,12 +960,12 @@ namespace ls180s2_gazel {
         config_data[5] = 0x22;
         config_data[6] = 0xAA;
         config_data[7] = 0xAA;
-        AERROR << "950 LslidarChDriver::setPacketHeader end line " << std::endl;
+        AERROR << "955 LslidarChDriver::setPacketHeader end line " << std::endl;
     }
 
     // this one  will probably not require any proto setting changes. sockaddr_in is struct
     bool LslidarChDriver::sendPacketTolidar(unsigned char *config_data) const { 
-        AERROR << "955 LslidarChDriver::sendPacketTolidar start line " << std::endl;
+        AERROR << "960 LslidarChDriver::sendPacketTolidar start line " << std::endl;
         int socketid;
         sockaddr_in addrSrv{};
         socketid = socket(2, 2, 0);
@@ -967,7 +973,7 @@ namespace ls180s2_gazel {
         addrSrv.sin_family = AF_INET;
         addrSrv.sin_port = htons(2368);
         sendto(socketid, (const char *) config_data, 1206, 0, (struct sockaddr *) &addrSrv, sizeof(addrSrv));
-        AERROR << "963 LslidarChDriver::sendPacketTolidar end line " << std::endl;
+        AERROR << "968 LslidarChDriver::sendPacketTolidar end line " << std::endl;
         return true;
     }   
 } // namespace lslidar_driver
