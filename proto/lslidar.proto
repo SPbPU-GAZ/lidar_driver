@@ -26,9 +26,10 @@ message INT64 {
 
 message LslidarMsgRawPacket {
     optional LslidarHeader header = 1;
-    optional uint64 stamp = 2;
-    repeated double prism_angle = 3; // [4]
-    repeated uint32 data = 4; // [1206]
+    optional uint32 stamp_sec = 2;
+    optional uint32 stamp_mil = 3;
+    repeated double prism_angle = 4; // [4]
+    repeated uint32 data = 5; // [1206]
 }
 
 message LslidarMsgScanUnfield {

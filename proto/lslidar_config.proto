@@ -6,8 +6,9 @@ import "modules/common_msgs/basic_msgs/header.proto";
 
 message LslidarHeader {
     optional uint32 seq = 1;
-    optional uint64 stamp = 2;
-    optional string frame_id = 3;
+    optional uint32 stamp_sec = 2;
+    optional uint32 stamp_mil = 3;
+    optional string frame_id = 4;
 }
 
 message LslidarMsgPoint {
